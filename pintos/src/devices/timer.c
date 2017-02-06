@@ -17,6 +17,9 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+//2-3,6
+static struct list timer_list_sleeping;
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -37,6 +40,8 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+	//2-3,6
+  list_init(&timer_list_sleeping);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +89,50 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/*2-7 comparison method for ordered list timer_list_sleeping */ //if a < b return true
+bool timer_compare(const struct list_elem *a, const struct list_elem *b, void *aux) {
+	const struct thread *a_thread = list_entry(a, struct thread, timer_elem);
+	const struct thread *b_thread = list_entry(b, struct thread, timer_elem);
+	//printf(a_thread->wake_time < b_thread->wake_time ? "true" : "false");
+	printf("%s: %d, %s: %d\n", a_thread->name, a_thread->wake_time, b_thread->name,b_thread->wake_time);
+	return (a_thread->wake_time < b_thread->wake_time);
+	/*if (a_thread->wake_time < b_thread->wake_time)
+		return a_thread->wake_time < b_thread->wake_time;
+	else
+		return a_thread->priority > b_thread->priority;*/
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  //int64_t start = timer_ticks ();
+	struct thread *t = thread_current();
+	
 
+	t->wake_time = ticks + timer_ticks();
+	//if (ticks<= 0) return;
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  //struct semaphore timer_sema;
+  //sema_init(&timer_sema, 1);
+  //sema_down(&timer_sema);
+  //while (timer_elapsed (start) < ticks) { 
+    //thread_yield ();
+    //printf("tick");
+    //printf("\n thread %d, ticks: %d\n", thread_current(), timer_ticks());
+  //  usleep(10000);
+  //}
+  //sema_up(&timer_sema);
+  
+  enum intr_level old_level = intr_disable();
+  //printf("old wake time: %d\n", thread_current()->wake_time);
+  printf("%s, set wake time:%"PRId64", ticks:%"PRId64"\n",t->name, t->wake_time, ticks);
+  //printf("thread: %s wake time: %d\n", thread_current()->name, thread_current()->wake_time);
+  list_insert_ordered(&timer_list_sleeping, &t->timer_elem, timer_compare, NULL);
+  intr_set_level(old_level);
+
+  sema_down(&t->timer_sem);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -170,8 +209,25 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  struct thread *t;
+
   ticks++;
   thread_tick ();
+
+  //2-1 changes //foreach of all [blocked] threads somehow
+  enum intr_level old_level = intr_disable();
+	while (!list_empty (&timer_list_sleeping))
+	{
+		t = list_entry (list_front (&timer_list_sleeping), struct thread, timer_elem);
+		printf("%s: wake: %d, timer_ticks: %d, ticks: %d\n",t->name, t->wake_time, timer_ticks(), ticks);
+		if (ticks < t->wake_time) 
+			break;
+		
+		sema_up (&t->timer_sem);
+		list_pop_front(&timer_list_sleeping);
+	}
+  //thread_foreach(&wake_check, NULL);
+  intr_set_level(old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
