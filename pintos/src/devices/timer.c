@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -16,6 +17,9 @@
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
+
+//2-6, list of all threads that are sleeping because of timer_sleep
+static struct list timer_list_sleeping;
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -37,6 +41,8 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+	//initializes list
+  list_init(&timer_list_sleeping);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +90,44 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/*2-7 comparison method for ordered list timer_list_sleeping */
+bool timer_compare(const struct list_elem *a, const struct list_elem *b, void *aux) {
+	
+	const struct thread *a_thread = list_entry(a, struct thread, timer_elem);
+	const struct thread *b_thread = list_entry(b, struct thread, timer_elem);
+
+	if (a_thread->wake_time != b_thread->wake_time) {
+		if (a_thread->wake_time < b_thread->wake_time) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	else {
+		return a_thread->priority > b_thread->priority;
+	}
+
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+	struct thread *t = thread_current();
 
+	t->wake_time = ticks + timer_ticks();
+	
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  
+  intr_disable();
+
+  list_insert_ordered(&timer_list_sleeping, &t->timer_elem, &timer_compare, NULL);
+
+  intr_enable();
+
+  sema_down(&t->timer_sem);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -170,8 +204,23 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  struct thread *t;
+
   ticks++;
   thread_tick ();
+
+  //loop over all [blocked] threads somehow
+  enum intr_level old_level = intr_disable();
+	while (!list_empty (&timer_list_sleeping))
+	{
+		t = list_entry (list_front (&timer_list_sleeping), struct thread, timer_elem);
+		if (ticks < t->wake_time) { //list is ordered so if first one isn't ready, none of them are
+			break;
+		}
+		sema_up (&t->timer_sem);
+		list_pop_front(&timer_list_sleeping);
+	}
+  intr_set_level(old_level);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
