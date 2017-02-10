@@ -22,7 +22,7 @@ Joshua Langford
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation,
 >> course text, lecture notes, and course staff.
-
+timer.c we got inspiration from https://github.com/Hindol/pintos/blob/master/devices/timer.c.
 
                  ALARM CLOCK
                  ===========
@@ -84,6 +84,7 @@ By using interrupts it was a quick and simple way to maintain atomicity while ac
 
 >> B2: Explain the data structure used to track priority donation.
 
+Linked list??
 
 ---- ALGORITHMS ----
 
