@@ -7,8 +7,6 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-//2-8
-#include "lib/kernel/list.h"
 
   
 /* See [8254] for hardware details of the 8254 timer chip. */
@@ -20,7 +18,7 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-//2-3,6
+//2-6, list of all threads that are sleeping because of timer_sleep
 static struct list timer_list_sleeping;
 
 /* Number of timer ticks since OS booted. */
@@ -43,7 +41,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-	//2-3,6
+	//initializes list
   list_init(&timer_list_sleeping);
 }
 
@@ -92,30 +90,22 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/*2-7 comparison method for ordered list timer_list_sleeping */ //if a < b return true
+/*2-7 comparison method for ordered list timer_list_sleeping */
 bool timer_compare(const struct list_elem *a, const struct list_elem *b, void *aux) {
 	
 	const struct thread *a_thread = list_entry(a, struct thread, timer_elem);
 	const struct thread *b_thread = list_entry(b, struct thread, timer_elem);
 
-	//printf("compare- %s: %"PRId64", %s: %"PRId64"\n", a_thread->name, a_thread->wake_time, b_thread->name, b_thread->wake_time);
-
 	if (a_thread->wake_time != b_thread->wake_time) {
 		if (a_thread->wake_time < b_thread->wake_time) {
-			//printf("less\n");
 			return true;
 		}
 		else {
-			//printf("greater\n");
 			return false;
 		}
-		//return a_thread->wake_time < b_thread->wake_time;
 	}
 	else {
-		//printf("equal... priA: %s priB: %s\n\n", a_thread->priority, b_thread->priority);
-		//printf("equal\n");
 		return a_thread->priority > b_thread->priority;
-		//return true;
 	}
 
 }
@@ -126,16 +116,12 @@ void
 timer_sleep (int64_t ticks) 
 {
 	struct thread *t = thread_current();
-	
-	//if (ticks <= 0) return;
 
 	t->wake_time = ticks + timer_ticks();
 	
   ASSERT (intr_get_level () == INTR_ON);
   
   intr_disable();
-
-  //printf("%s, set wake time:%"PRId64", ticks:%"PRId64"\n\n",t->name, t->wake_time, timer_ticks());
 
   list_insert_ordered(&timer_list_sleeping, &t->timer_elem, &timer_compare, NULL);
 
@@ -223,16 +209,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  //2-1 changes //foreach of all [blocked] threads somehow
+  //loop over all [blocked] threads somehow
   enum intr_level old_level = intr_disable();
 	while (!list_empty (&timer_list_sleeping))
 	{
 		t = list_entry (list_front (&timer_list_sleeping), struct thread, timer_elem);
-		//printf("%s: wake: %"PRId64", ticks: %"PRId64"\n",t->name, t->wake_time, ticks);
-		if (ticks < t->wake_time) {
+		if (ticks < t->wake_time) { //list is ordered so if first one isn't ready, none of them are
 			break;
 		}
-		//printf("waking %s: wake: %"PRId64", ticks: %"PRId64"\n", t->name, t->wake_time, ticks);
 		sema_up (&t->timer_sem);
 		list_pop_front(&timer_list_sleeping);
 	}

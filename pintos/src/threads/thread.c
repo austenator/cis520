@@ -14,7 +14,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
-// hey
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -469,10 +469,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  //2-1,2-7
+  //2-1,2-7 initialize semaphore and wake_time
   sema_init (&(t->timer_sem), 0);
   t->wake_time = -1;
-  //end 2-1,2-7 
+
   list_push_back (&all_list, &t->allelem);
 }
 
