@@ -470,7 +470,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   //2-1,2-7
-  sema_init (&(t->timer_sem), 1);
+  sema_init (&(t->timer_sem), 0);
   t->wake_time = -1;
   //end 2-1,2-7 
   list_push_back (&all_list, &t->allelem);

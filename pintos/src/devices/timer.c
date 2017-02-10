@@ -98,24 +98,24 @@ bool timer_compare(const struct list_elem *a, const struct list_elem *b, void *a
 	const struct thread *a_thread = list_entry(a, struct thread, timer_elem);
 	const struct thread *b_thread = list_entry(b, struct thread, timer_elem);
 
-	printf("compare- %s: %"PRId64", %s: %"PRId64"\n", a_thread->name, a_thread->wake_time, b_thread->name, b_thread->wake_time);
+	//printf("compare- %s: %"PRId64", %s: %"PRId64"\n", a_thread->name, a_thread->wake_time, b_thread->name, b_thread->wake_time);
 
 	if (a_thread->wake_time != b_thread->wake_time) {
 		if (a_thread->wake_time < b_thread->wake_time) {
-			printf("less\n");
+			//printf("less\n");
 			return true;
 		}
 		else {
-			printf("greater\n");
+			//printf("greater\n");
 			return false;
 		}
 		//return a_thread->wake_time < b_thread->wake_time;
 	}
 	else {
 		//printf("equal... priA: %s priB: %s\n\n", a_thread->priority, b_thread->priority);
-		printf("equal\n");
-		//return a_thread->priority > b_thread->priority;
-		return true;
+		//printf("equal\n");
+		return a_thread->priority > b_thread->priority;
+		//return true;
 	}
 
 }
@@ -135,7 +135,7 @@ timer_sleep (int64_t ticks)
   
   intr_disable();
 
-  printf("%s, set wake time:%"PRId64", ticks:%"PRId64"\n\n",t->name, t->wake_time, timer_ticks());
+  //printf("%s, set wake time:%"PRId64", ticks:%"PRId64"\n\n",t->name, t->wake_time, timer_ticks());
 
   list_insert_ordered(&timer_list_sleeping, &t->timer_elem, &timer_compare, NULL);
 
@@ -228,11 +228,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
 	while (!list_empty (&timer_list_sleeping))
 	{
 		t = list_entry (list_front (&timer_list_sleeping), struct thread, timer_elem);
-		printf("%s: wake: %"PRId64", ticks: %"PRId64"\n",t->name, t->wake_time, ticks);
+		//printf("%s: wake: %"PRId64", ticks: %"PRId64"\n",t->name, t->wake_time, ticks);
 		if (ticks < t->wake_time) {
 			break;
 		}
-		printf("waking %s: wake: %"PRId64", ticks: %"PRId64"\n", t->name, t->wake_time, ticks);
+		//printf("waking %s: wake: %"PRId64", ticks: %"PRId64"\n", t->name, t->wake_time, ticks);
 		sema_up (&t->timer_sem);
 		list_pop_front(&timer_list_sleeping);
 	}
