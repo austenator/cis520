@@ -10,6 +10,9 @@
 #include "threads/palloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
+//
+//#include "threads/synch.c"
+//
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -217,14 +220,24 @@ thread_create (const char *name, int priority,
 
 //2-13
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
-	const struct thread *a_thread = list_entry(a, struct thread, elem);
-	const struct thread *b_thread = list_entry(b, struct thread, elem);
+	if (((int *)aux) == 2) { //semaphore_elem came in
+		const struct semaphore_elem a_elem = list_entry(a, struct semaphore_elem, elem);
+		const struct semaphore_elem b_elem = list_entry(b, struct semaphore_elem, elem);
 
-	if (a_thread->priority != b_thread->priority) {
-		return a_thread->priority > b_thread->priority;
-	}
-	else {
-		return false; //if same priority, want a to go behind b like fifo
+		const struct thread *aa_thread = list_entry(list_begin(&a_elem.semaphore.waiters), struct thread, elem);
+		const struct thread *bb_thread = list_entry(list_begin(&b_elem.semaphore.waiters), struct thread, elem);
+		return aa_thread->priority > bb_thread->priority;
+	
+	} else {
+		const struct thread *a_thread = list_entry(a, struct thread, elem);
+		const struct thread *b_thread = list_entry(b, struct thread, elem);
+
+		if (a_thread->priority != b_thread->priority) {
+			return a_thread->priority > b_thread->priority;
+		}
+		else {
+			return false; //if same priority, want a to go behind b like fifo
+		}
 	}
 }
 //end 2-13
