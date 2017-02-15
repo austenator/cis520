@@ -208,9 +208,26 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+	//2-13
+	thread_yield();
+	//end 2-13
 
   return tid;
 }
+
+//2-13
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
+	const struct thread *a_thread = list_entry(a, struct thread, elem);
+	const struct thread *b_thread = list_entry(b, struct thread, elem);
+
+	if (a_thread->priority != b_thread->priority) {
+		return a_thread->priority > b_thread->priority;
+	}
+	else {
+		return false; //if same priority, want a to go behind b like fifo
+	}
+}
+//end 2-13
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -245,9 +262,15 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+	//2-13
+  //list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, &priority_compare, NULL);
+	//end 2-13
   t->status = THREAD_READY;
+	//2-13
+	//end 2-13
   intr_set_level (old_level);
+
 }
 
 /* Returns the name of the running thread. */
@@ -315,8 +338,12 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread) { 
+		//2-13    
+		//list_push_back (&ready_list, &cur->elem);
+		list_insert_ordered(&ready_list, &cur->elem, &priority_compare, NULL);
+		//end 2-13
+	}
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -344,6 +371,10 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+	//2-13
+	list_sort(&ready_list, &priority_compare, NULL);
+	thread_yield();
+	//end 2-13
 }
 
 /* Returns the current thread's priority. */
@@ -499,8 +530,12 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
+  else {
+		//2-13
+		list_sort(&ready_list, &priority_compare, NULL);
+		//end 2-13 //no easy sort method... -must call sort everytime a prior changed!
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	}
 }
 
 /* Completes a thread switch by activating the new thread's page
