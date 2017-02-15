@@ -221,11 +221,11 @@ thread_create (const char *name, int priority,
 //2-13
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
 	if (((int *)aux) == 2) { //semaphore_elem came in
-		const struct semaphore_elem a_elem = list_entry(a, struct semaphore_elem, elem);
-		const struct semaphore_elem b_elem = list_entry(b, struct semaphore_elem, elem);
+		struct semaphore_elem *a_elem = list_entry(a, struct semaphore_elem, elem);
+		struct semaphore_elem *b_elem = list_entry(b, struct semaphore_elem, elem);
 
-		const struct thread *aa_thread = list_entry(list_begin(&a_elem.semaphore.waiters), struct thread, elem);
-		const struct thread *bb_thread = list_entry(list_begin(&b_elem.semaphore.waiters), struct thread, elem);
+		const struct thread *aa_thread = list_entry(list_begin(&(a_elem->semaphore.waiters)), struct thread, elem);
+		const struct thread *bb_thread = list_entry(list_begin(&b_elem->semaphore.waiters), struct thread, elem);
 		return aa_thread->priority > bb_thread->priority;
 	
 	} else {
