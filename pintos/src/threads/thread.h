@@ -82,6 +82,15 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+typedef struct l_list_elem 
+  {
+    struct l_list_elem *next;     /* Next list element. */
+	int donated_priority;
+	struct lock *donated_lock;
+  } l_list_elem;
+
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -96,6 +105,10 @@ struct thread
 	int64_t wake_time;
 	struct list_elem timer_elem;
 	//end 2-1,2-7
+	//2-16
+	int priority_orig;
+	struct l_list_elem *donations;
+	//end 2-16
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -126,6 +139,16 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 //2-15
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 //end 2-15
+
+//2-16
+
+l_list_elem *release_donations(struct lock *lock); //method to remove lock from list of donated priorities
+
+void donate(struct lock *lock); //method to donate my priority to holder of lock
+
+int llist_max(struct l_list_elem *list, int pri_orig);
+
+//end 2-16
 
 void thread_block (void);
 void thread_unblock (struct thread *);

@@ -10,9 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
-//
-//#include "threads/synch.c"
-//
+
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -242,6 +240,57 @@ bool priority_compare (const struct list_elem *a, const struct list_elem *b, voi
 }
 //end 2-13
 
+//2-16
+l_list_elem *release_donations(struct lock *lock) {//method to remove lock from list of donated priorities
+	struct thread *t = thread_current();	
+	struct l_list_elem *temp;
+	//temp
+	temp->donated_priority=-1;
+	//printf("here3\n");
+	temp->next = t->donations; //page fault occurs here...
+	struct l_list_elem *front = temp;
+	
+	while (temp->next != NULL) {
+		if (temp->next->donated_lock == lock) {
+			temp->next = temp->next->next;
+		} else {
+			temp = temp->next;
+		}
+	}
+	t->priority = llist_max(front->next, t->priority_orig);
+	return front->next;
+}
+
+void donate(struct lock *lock) { //method to donate my priority to holder of lock
+	if (lock->holder == NULL) return;
+	int my_pri = thread_current()->priority;
+	struct thread *t = lock->holder;
+	if (my_pri > t->priority) { //donate
+		struct l_list_elem *new_pri;
+		new_pri->donated_priority = my_pri;
+		new_pri->donated_lock = lock;
+		new_pri->next = t->donations;
+		t->donations = new_pri;
+		t->priority = my_pri;//llist_max(t->donations); //redundant: could just set my_pri
+	}
+}
+
+int llist_max(struct l_list_elem *list, int pri_orig) {
+	if (list == NULL) return pri_orig;
+	printf("here2\n");
+	int max = pri_orig;
+	struct l_list_elem *l = list;
+	while (l != NULL) {
+		printf("here\n");
+		if (l->donated_priority > max) {
+			max = l->donated_priority;
+		}
+		l = l->next;
+	}
+	return max;
+}
+//end 2-16
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -383,7 +432,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+	//2-16
+	thread_current()->priority_orig = new_priority;
+	printf("max: %d\n", llist_max(thread_current()->donations, new_priority));
+  thread_current ()->priority = llist_max(thread_current()->donations, new_priority);
 	//2-13
 	list_sort(&ready_list, &priority_compare, NULL);
 	thread_yield();
@@ -516,6 +568,9 @@ init_thread (struct thread *t, const char *name, int priority)
   //2-1,2-7 initialize semaphore and wake_time
   sema_init (&(t->timer_sem), 0);
   t->wake_time = -1;
+  //2-16
+  t->priority_orig = priority;
+	t->donations = NULL;
 
   list_push_back (&all_list, &t->allelem);
 }
