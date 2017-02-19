@@ -338,6 +338,7 @@ thread_unblock (struct thread *t)
 	list_insert_ordered(&ready_list, &t->elem, &priority_compare, NULL);
 	//end 2-13
   t->status = THREAD_READY;
+	//thread_yield();
 	//2-13
 	//end 2-13
   intr_set_level (old_level);
