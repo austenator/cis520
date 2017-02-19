@@ -10,6 +10,8 @@
 #include "threads/palloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
+//
+#include "threads/malloc.h"
 
 #include "threads/vaddr.h"
 #ifdef USERPROG
@@ -241,47 +243,54 @@ bool priority_compare (const struct list_elem *a, const struct list_elem *b, voi
 //end 2-13
 
 //2-16
-l_list_elem *release_donations(struct lock *lock) {//method to remove lock from list of donated priorities
-	struct thread *t = thread_current();	
-	struct l_list_elem *temp;
-	//temp
-	temp->donated_priority=-1;
-	//printf("here3\n");
-	temp->next = t->donations; //page fault occurs here...
-	struct l_list_elem *front = temp;
+struct l_list_elem *release_donations(struct lock *lock) {//method to remove lock from list of donated priorities
+	struct thread *t = thread_current();
+	if (t->donations == NULL) return NULL;
+	struct l_list_elem *free_temp;
+	struct l_list_elem *temp;// = (struct l_list_elem *)malloc(sizeof(struct l_list_elem));
+	//struct l_list_elem *front = t->donations;
+
+	temp = t->donations; //page fault occurs here...
+	struct l_list_elem *prev;// = temp;
 	
-	while (temp->next != NULL) {
-		if (temp->next->donated_lock == lock) {
-			temp->next = temp->next->next;
+	while (temp != NULL) {
+		if (temp->donated_lock == lock) {
+			if (temp == t->donations) {
+				t->donations = t->donations->next;
+			} else {
+				prev->next = temp->next;
+			}
+			free_temp = temp;
+			//prev->next = temp->next;
+			temp = temp->next;
+			free(free_temp);
 		} else {
+			prev = temp;
 			temp = temp->next;
 		}
 	}
-	t->priority = llist_max(front->next, t->priority_orig);
-	return front->next;
+	t->priority = llist_max(t->donations, t->priority_orig);
+	return t->donations;
 }
 
 void donate(struct lock *lock) { //method to donate my priority to holder of lock
-	if (lock->holder == NULL) return;
+	struct thread *t;
 	int my_pri = thread_current()->priority;
-	struct thread *t = lock->holder;
-	if (my_pri > t->priority) { //donate
-		struct l_list_elem *new_pri;
-		new_pri->donated_priority = my_pri;
-		new_pri->donated_lock = lock;
-		new_pri->next = t->donations;
-		t->donations = new_pri;
-		t->priority = my_pri;//llist_max(t->donations); //redundant: could just set my_pri
-	}
+	if (lock->holder == NULL || my_pri <= lock->holder->priority) return;
+	struct l_list_elem *front = (struct l_list_elem *)malloc(sizeof(struct l_list_elem));
+	t = lock->holder;
+	front->donated_priority = my_pri;
+	front->next = t->donations;
+	front->donated_lock = lock;
+	t->donations = front;
+	t->priority = my_pri;
 }
 
 int llist_max(struct l_list_elem *list, int pri_orig) {
 	if (list == NULL) return pri_orig;
-	printf("here2\n");
 	int max = pri_orig;
 	struct l_list_elem *l = list;
 	while (l != NULL) {
-		printf("here\n");
 		if (l->donated_priority > max) {
 			max = l->donated_priority;
 		}
@@ -434,7 +443,7 @@ thread_set_priority (int new_priority)
 {
 	//2-16
 	thread_current()->priority_orig = new_priority;
-	printf("max: %d\n", llist_max(thread_current()->donations, new_priority));
+	//printf("max: %d\n", llist_max(thread_current()->donations, new_priority));
   thread_current ()->priority = llist_max(thread_current()->donations, new_priority);
 	//2-13
 	list_sort(&ready_list, &priority_compare, NULL);

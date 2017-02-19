@@ -83,12 +83,12 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
-typedef struct l_list_elem 
+struct l_list_elem 
   {
     struct l_list_elem *next;     /* Next list element. */
 	int donated_priority;
 	struct lock *donated_lock;
-  } l_list_elem;
+  };
 
 
 struct thread
@@ -142,7 +142,7 @@ bool priority_compare (const struct list_elem *a, const struct list_elem *b, voi
 
 //2-16
 
-l_list_elem *release_donations(struct lock *lock); //method to remove lock from list of donated priorities
+struct l_list_elem *release_donations(struct lock *lock); //method to remove lock from list of donated priorities
 
 void donate(struct lock *lock); //method to donate my priority to holder of lock
 
