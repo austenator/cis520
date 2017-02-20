@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-//2-1
+
 #include "threads/synch.h"
 
 /* States in a thread's life cycle. */
@@ -88,6 +88,7 @@ struct l_list_elem
     struct l_list_elem *next;     /* Next list element. */
 	int donated_priority;
 	struct lock *donated_lock;
+	struct thread *donor_thread;
   };
 
 
@@ -100,15 +101,15 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-	//added 2-1,2-7
-	struct semaphore timer_sem;
-	int64_t wake_time;
-	struct list_elem timer_elem;
-	//end 2-1,2-7
-	//2-16
-	int priority_orig;
-	struct l_list_elem *donations;
-	//end 2-16
+		//properties added for timer
+		struct semaphore timer_sem;
+		int64_t wake_time;
+		struct list_elem timer_elem;
+
+		//properties added for priority
+		int priority_orig;
+		struct l_list_elem *donations;
+		struct lock *donee_lock;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -136,19 +137,14 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
-//2-15
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
-//end 2-15
-
-//2-16
 
 struct l_list_elem *release_donations(struct lock *lock); //method to remove lock from list of donated priorities
 
-void donate(struct lock *lock); //method to donate my priority to holder of lock
+void donate(struct lock *lock, bool first_level); //method to donate my priority to holder of lock
 
 int llist_max(struct l_list_elem *list, int pri_orig);
 
-//end 2-16
 
 void thread_block (void);
 void thread_unblock (struct thread *);

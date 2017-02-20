@@ -18,7 +18,7 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-//2-6, list of all threads that are sleeping because of timer_sleep
+//list of all threads that are sleeping because of timer_sleep
 static struct list timer_list_sleeping;
 
 /* Number of timer ticks since OS booted. */
@@ -90,7 +90,7 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/*2-7 comparison method for ordered list timer_list_sleeping */
+/* comparison method for ordered list timer_list_sleeping */
 bool timer_compare(const struct list_elem *a, const struct list_elem *b, void *aux) {
 	
 	const struct thread *a_thread = list_entry(a, struct thread, timer_elem);
@@ -209,7 +209,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
-  //loop over all [blocked] threads somehow
+  //loop over all [blocked] threads
   enum intr_level old_level = intr_disable();
 	while (!list_empty (&timer_list_sleeping))
 	{

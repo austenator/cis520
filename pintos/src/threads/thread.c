@@ -10,7 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
-//
+
 #include "threads/malloc.h"
 
 #include "threads/vaddr.h"
@@ -211,14 +211,12 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-	//2-13
+
 	thread_yield();
-	//end 2-13
 
   return tid;
 }
 
-//2-13
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux) {
 	if (((int *)aux) == 2) { //semaphore_elem came in
 		struct semaphore_elem *a_elem = list_entry(a, struct semaphore_elem, elem);
@@ -240,18 +238,15 @@ bool priority_compare (const struct list_elem *a, const struct list_elem *b, voi
 		}
 	}
 }
-//end 2-13
 
-//2-16
 struct l_list_elem *release_donations(struct lock *lock) {//method to remove lock from list of donated priorities
 	struct thread *t = thread_current();
 	if (t->donations == NULL) return NULL;
 	struct l_list_elem *free_temp;
-	struct l_list_elem *temp;// = (struct l_list_elem *)malloc(sizeof(struct l_list_elem));
-	//struct l_list_elem *front = t->donations;
+	struct l_list_elem *temp;
 
-	temp = t->donations; //page fault occurs here...
-	struct l_list_elem *prev;// = temp;
+	temp = t->donations;
+	struct l_list_elem *prev;
 	
 	while (temp != NULL) {
 		if (temp->donated_lock == lock) {
@@ -261,7 +256,7 @@ struct l_list_elem *release_donations(struct lock *lock) {//method to remove loc
 				prev->next = temp->next;
 			}
 			free_temp = temp;
-			//prev->next = temp->next;
+			free_temp->donor_thread->donee_lock = NULL;
 			temp = temp->next;
 			free(free_temp);
 		} else {
@@ -273,17 +268,31 @@ struct l_list_elem *release_donations(struct lock *lock) {//method to remove loc
 	return t->donations;
 }
 
-void donate(struct lock *lock) { //method to donate my priority to holder of lock
+void donate(struct lock *lock, bool first_level) { //method to donate my priority to holder of lock
 	struct thread *t;
 	int my_pri = thread_current()->priority;
 	if (lock->holder == NULL || my_pri <= lock->holder->priority) return;
+
 	struct l_list_elem *front = (struct l_list_elem *)malloc(sizeof(struct l_list_elem));
+
 	t = lock->holder;
+
 	front->donated_priority = my_pri;
 	front->next = t->donations;
 	front->donated_lock = lock;
+	front->donor_thread = thread_current();
+
 	t->donations = front;
 	t->priority = my_pri;
+
+	if (first_level) { //so that only sets donee_lock on non-recursive calls to donate
+		thread_current()->donee_lock = lock;
+	}
+
+	//for nested donations
+	if (t->donee_lock != NULL) {
+		donate(t->donee_lock, false);
+	}
 }
 
 int llist_max(struct l_list_elem *list, int pri_orig) {
@@ -298,7 +307,6 @@ int llist_max(struct l_list_elem *list, int pri_orig) {
 	}
 	return max;
 }
-//end 2-16
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -333,14 +341,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-	//2-13
-  //list_push_back (&ready_list, &t->elem);
 	list_insert_ordered(&ready_list, &t->elem, &priority_compare, NULL);
-	//end 2-13
+
   t->status = THREAD_READY;
-	//thread_yield();
-	//2-13
-	//end 2-13
+
   intr_set_level (old_level);
 
 }
@@ -411,10 +415,9 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) { 
-		//2-13    
-		//list_push_back (&ready_list, &cur->elem);
+
 		list_insert_ordered(&ready_list, &cur->elem, &priority_compare, NULL);
-		//end 2-13
+
 	}
   cur->status = THREAD_READY;
   schedule ();
@@ -442,14 +445,13 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-	//2-16
 	thread_current()->priority_orig = new_priority;
-	//printf("max: %d\n", llist_max(thread_current()->donations, new_priority));
+
   thread_current ()->priority = llist_max(thread_current()->donations, new_priority);
-	//2-13
+
 	list_sort(&ready_list, &priority_compare, NULL);
 	thread_yield();
-	//end 2-13
+
 }
 
 /* Returns the current thread's priority. */
@@ -575,12 +577,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  //2-1,2-7 initialize semaphore and wake_time
+
   sema_init (&(t->timer_sem), 0);
   t->wake_time = -1;
-  //2-16
+
   t->priority_orig = priority;
 	t->donations = NULL;
+	t->donee_lock = NULL;
 
   list_push_back (&all_list, &t->allelem);
 }
@@ -609,9 +612,9 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else {
-		//2-13
+
 		list_sort(&ready_list, &priority_compare, NULL);
-		//end 2-13 //no easy sort method... -must call sort everytime a prior changed!
+
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 	}
 }

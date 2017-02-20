@@ -126,7 +126,7 @@ sema_up (struct semaphore *sema)
 	}
   sema->value++;
   intr_set_level (old_level);
- 	//added 2-16
+
   if (need_yield){
 	if (!intr_context())
 	thread_yield();	
@@ -211,8 +211,8 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-	//watch interrupts here?
-	donate (lock);	
+
+	donate (lock, true);	
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
@@ -251,7 +251,7 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-	//interrupts?
+
 	thread_current()->donations = release_donations(lock);	
 
 	thread_yield();
@@ -268,12 +268,12 @@ lock_held_by_current_thread (const struct lock *lock)
   return lock->holder == thread_current ();
 }
 
-/* One semaphore in a list. */ //not sure if should leave as is or not...
-//struct semaphore_elem 
-//  {
-//    struct list_elem elem;              /* List element. */
-//    struct semaphore semaphore;         /* This semaphore. */
-//  };
+/* One semaphore in a list.  --not sure if should leave as is or not...
+struct semaphore_elem 
+  {
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
+ /* };*/
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -339,7 +339,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) {
-		list_sort(&cond->waiters, &priority_compare, (void *)2); //change null to a flag that semaphore_elems are coming in
+		list_sort(&cond->waiters, &priority_compare, (void *)2); 
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
 		thread_yield();
