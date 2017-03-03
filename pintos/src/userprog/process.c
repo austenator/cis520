@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+//
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -53,13 +55,53 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+	//
+	int argc, i;
+	char *token, *save_ptr;
+	void *start;
+	int *argv_off;
+	//size_t file_name_len;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+	//
+	argc = 0;
+	argv_off = malloc(32 * sizeof(int)); //handle this later...if it comes back unitialized
+	//file_name_len = strlen(file_name);
+	argv_off[0] = 0;
+	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr) ) {
+		argv_off[argc] = token - file_name;
+		argc++;
+	}
+	//
   success = load (file_name, &if_.eip, &if_.esp);
+	
+	//
+	if (success) {
+		if_.esp -= strlen(file_name) + 1;
+		start = if_.esp;
+		memcpy (if_.esp, file_name, strlen(file_name) + 1);
+		if_.esp -= 4 - (strlen(file_name) + 1) % 4;
+		if_.esp -= 4;
+		*(int *)(if_.esp) = 0; //argv[argc] = 0;
+		
+		for (i = argc-1; i>=0; i--) {
+			if_.esp -= 4;
+			*(void **)(if_.esp) = start + argv_off[i]; //pushes argument i onto the stack (loop causes it in reverse order)
+		}
+		if_.esp -= 4;
+		*(char **)(if_.esp) = (if_.esp + 4); //push pointer to argv array
+		if_.esp -= 4;
+		*(int *)(if_.esp) = argc;
+		if_.esp -= 4;
+		*(int *)(if_.esp) = 0; //fake return address
+	}
+
+	free (argv_off);
+	//
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -88,7 +130,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+	while (true) { }  
+	
+	return -1;
 }
 
 /* Free the current process's resources. */
@@ -437,7 +481,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
