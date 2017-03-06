@@ -3,8 +3,19 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+//
+#include <string.h>
+
 
 static void syscall_handler (struct intr_frame *);
+void sys_halt (void);
+void sys_exit (int status);
+int sys_exec (const char *cmd_line);
+int sys_wait (int pid);
+int sys_create (const char *file, unsigned initial_size);
+int sys_remove (const char *file);
+int sys_open (const char *file);
+void copy_in (void *dest, void *src, unsigned int size);
 
 void
 syscall_init (void) 
@@ -24,10 +35,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* A system call. */   
   struct syscall     
   {       
-	size_t arg_cnt;           
-	/* Number of arguments. */       
-	syscall_function *func;   
-	/* Implementation. */     
+		size_t arg_cnt;           /* Number of arguments. */       
+		syscall_function *func;   /* Implementation. */     
 	};   
 	/* Table of system calls. */   
 	static const struct syscall syscall_table[] =     
@@ -38,7 +47,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		{1, (syscall_function *) sys_wait},       
 		{2, (syscall_function *) sys_create},       
 		{1, (syscall_function *) sys_remove},       
-		{1, (syscall_function *) sys_open},
+		{1, (syscall_function *) sys_open}//,
 		// need to put the rest in
 		//{x, (syscall_function *) sys_filesize},
 		//{x, (syscall_function *) sys_read},
@@ -46,7 +55,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		//{x, (syscall_function *) sys_seek},
 		//{x, (syscall_function *) sys_tell},
 		//{x, (syscall_function *) sys_close}
-	}
+	};
 
 	const struct syscall *sc;   
 	unsigned call_nr;   
@@ -64,6 +73,34 @@ syscall_handler (struct intr_frame *f UNUSED)
 	copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);   
 	/* Execute the system call,      and set the return value. */   
 	f->eax = sc->func (args[0], args[1], args[2]);
-  }
+  //}
   //thread_exit ();
 }
+
+void copy_in (void *dest, void *src UNUSED, unsigned int size UNUSED) {
+	*(char *)dest = 0;
+}
+
+void sys_halt (void) {
+
+}
+void sys_exit (int status UNUSED) {
+
+}
+int sys_exec (const char *cmd_line UNUSED) {
+	return 0;
+}
+int sys_wait (int pid UNUSED) {
+	return 0;
+}
+int sys_create (const char *file UNUSED, unsigned initial_size UNUSED) {
+	return 0;
+}
+int sys_remove (const char *file UNUSED) {
+	return 0;
+}
+int sys_open (const char *file UNUSED) {
+	return 0;
+}
+
+
