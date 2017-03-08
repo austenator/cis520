@@ -60,7 +60,7 @@ start_process (void *file_name_)
 	char *token, *save_ptr;
 	void *start;
 	int *argv_off;
-	//size_t file_name_len;
+	size_t file_name_len;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -70,7 +70,7 @@ start_process (void *file_name_)
 	//
 	argc = 0;
 	argv_off = malloc(32 * sizeof(int)); //handle this later...if it comes back unitialized
-	//file_name_len = strlen(file_name);
+	file_name_len = strlen(file_name) + 1;
 	argv_off[0] = 0;
 	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr) ) {
 		argv_off[argc] = token - file_name;
@@ -81,9 +81,9 @@ start_process (void *file_name_)
 	
 	//
 	if (success) {
-		if_.esp -= strlen(file_name) + 1;
+		if_.esp -= file_name_len; //strlen(file_name) + 1;
 		start = if_.esp;
-		memcpy (if_.esp, file_name, strlen(file_name) + 1);
+		memcpy (if_.esp, file_name,file_name_len /*strlen(file_name) + 1*/);
 		if_.esp -= 4 - (strlen(file_name) + 1) % 4;
 		if_.esp -= 4;
 		*(int *)(if_.esp) = 0; //argv[argc] = 0;
@@ -130,8 +130,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-	while (true) { }  
-	
+	while (true) { 
+
+	}  	
 	return -1;
 }
 
@@ -481,7 +482,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;// - 12;
       else
         palloc_free_page (kpage);
     }
