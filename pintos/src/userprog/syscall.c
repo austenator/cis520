@@ -9,6 +9,10 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/init.h"
+#include "list.h"
+#include "process.h"
+//needed to access all_list -not sure if should move all_list to .h file
+//#include "threads/thread.c"
 
 
 static void syscall_handler (struct intr_frame *);
@@ -40,7 +44,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
+  //printf ("system call!\n");
 
   typedef int syscall_function (int, int, int);
 
@@ -108,16 +112,32 @@ void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) {
 void sys_halt (void) {
 	shutdown_power_off();
 }
-void sys_exit (int status UNUSED) {
+void sys_exit (int status) {
 	printf("%s: exit(%d)\n", thread_current()->name, status);
+	thread_current()->wait_status->exit_code = 0;
 	thread_exit();
 }
-int sys_exec (const char *cmd_line UNUSED) {
-	return 0;
+int sys_exec (const char *cmd_line) {
+	pid_t pid = process_execute(cmd_line);
+	//add newly created thread/process to my list of children
+	//struct list_elem *e;
+	//struct thread *t;
+	//struct thread *cur = thread_current();
+	//for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next(e))
+	//{
+	//	t = list_entry(e, struct thread, allelem);
+	//	if (t->wait_status->tid == pid)
+	//	{
+	//		list_push_back(&cur->children, &t->wait_status->elem);
+	//		break;
+	//	}
+	//} //do all this in process_execute?
+	//list_push_back(&thread_current()->children, &LISTELEM);
+	return pid;
 }
 int sys_wait (int pid UNUSED) {
-	return 0;
-	//return process_wait(pid);
+	//return 0;
+	return process_wait(pid);
 }
 int sys_create (const char *file UNUSED, unsigned initial_size UNUSED) {
 	return 0;

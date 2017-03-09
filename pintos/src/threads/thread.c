@@ -11,6 +11,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+//
+#include "threads/malloc.h"
+//
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -26,7 +29,7 @@ static struct list ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
-static struct list all_list;
+struct list all_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -205,6 +208,19 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   intr_set_level (old_level);
+
+	//3-8 initialize structs that are helping keep track of child processes
+	//list_init(&t->children); //-done in init_thread func because main thread doesn't go thru this method
+	t->wait_status = malloc(sizeof(struct wait_status));
+	lock_init(&t->wait_status->lock);
+	t->wait_status->ref_cnt = 2;
+	t->wait_status->tid = tid;
+	t->wait_status->exit_code = NULL; //TODO: this equates to zero not what I want. try -2
+	sema_init(&t->wait_status->dead, 0); //init to zero so basically like a lock
+	
+	//list_push_back(&thread_current()->children, &t->wait_status->elem);
+	//end 3-8
+	
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -470,6 +486,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+	
+	//3-8
+	list_init(&t->children);
+	//end 3-8
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

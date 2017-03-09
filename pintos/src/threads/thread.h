@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+//3-8
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -100,7 +102,28 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+		//3-8 for tracking child processes
+		struct list children;
+		struct wait_status *wait_status;
+		
   };
+
+//3-8 wait_status struct to track completion of a process - came from ppt slides
+struct wait_status {
+	struct list_elem elem;
+	struct lock lock;
+	int ref_cnt;
+	tid_t tid;
+	int exit_code;
+	struct semaphore dead;
+};
+
+/* List of all processes.  Processes are added to this list
+   when they are first scheduled and removed when they exit. */
+extern struct list all_list; //--moved from .c file  //formerly static not extern
+
+//end 3-8
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

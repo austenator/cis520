@@ -44,6 +44,22 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+	
+	//code taken from sys_exec to keep track of child process
+	struct list_elem *e;
+	struct thread *t;
+	struct thread *cur = thread_current();
+	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next(e))
+	{
+		t = list_entry(e, struct thread, allelem);
+		if (t->tid == tid)
+		{
+			list_push_back(&cur->children, &t->wait_status->elem);
+			break;
+		}
+	}
+	//end 3-8
+
   return tid;
 }
 
@@ -130,10 +146,28 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-	while (true) { 
-
-	}  	
-	return -1;
+	int status = -1;
+  struct thread *cur = thread_current();
+	struct list_elem *e;
+	struct wait_status *s;
+	for (e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next(e))
+	{
+		s = list_entry(e, struct wait_status, elem);
+		if (s->tid == child_tid)
+		{
+			sema_down(&s->dead);
+			status = s->exit_code;
+			list_remove(&s->elem);
+			free(s);
+			break;
+		}
+	}
+	
+	//while (true) { 
+  //
+	//}  	
+	//return -1;
+	return status;
 }
 
 /* Free the current process's resources. */
@@ -143,6 +177,45 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+	//3-8
+	struct list_elem *e;
+	struct wait_status *s;
+	for (e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next(e))
+	{
+		s = list_entry(e, struct wait_status, elem);
+		lock_acquire(&s->lock);
+		s->ref_cnt--;
+		if (s->ref_cnt == 0)
+		{
+			//lock_release(&s->lock);//need this?
+			list_remove(&s->elem);
+			free(s);
+		} else {
+			lock_release(&s->lock);
+		}
+	}
+	if (cur->tid != 1)
+	{
+		lock_acquire(&cur->wait_status->lock);
+		cur->wait_status->ref_cnt--;
+		if (cur->wait_status->ref_cnt == 0 ) //both are dead and no one needs a reference to this wait_status anymore
+		{
+			//lock_release(&cur->wait_status->lock);
+			free(cur->wait_status);
+		} else {
+			lock_release(&cur->wait_status->lock);
+			if (!cur->wait_status->exit_code) //TODO: check if not equal to zero..might init to -2
+			{
+				cur->wait_status->exit_code = -1;
+			}
+			//needs to be done last so if parent is waiting, doesn't start too soon
+			sema_up(&cur->wait_status->dead); 
+		}
+	}
+	
+	//end 3-8
+	
+	
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
