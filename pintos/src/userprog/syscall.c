@@ -17,6 +17,8 @@
 //needed to access all_list -not sure if should move all_list to .h file
 //#include "threads/thread.c"
 
+//3-10
+#define USER_VADDR_BOTTOM ((void *) 0x08048000 //taken from memory layout description in proj2.pdf
 
 static void syscall_handler (struct intr_frame *);
 
@@ -110,9 +112,9 @@ void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) {
 	int *ptr;
 	for (i = 0; i<(size/4); i++) {
 		ptr = (int *) src + i;
-		if (!is_user_vaddr(ptr)) {
+		if (!is_user_vaddr(ptr)|| ptr < (int *)USER_VADDR_BOTTOM)) {
 			//call sys_exit(ERROR) ? instead of thread_exit()?
-			printf("not in user space!\n");
+			//printf("not in user space!\n");
 			//thread_exit();
 			sys_exit(-1);
 		}
