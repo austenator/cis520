@@ -11,6 +11,8 @@
 #include "threads/init.h"
 #include "list.h"
 #include "process.h"
+#include "threads/malloc.h"
+#include "filesys/filesys.h"
 //needed to access all_list -not sure if should move all_list to .h file
 //#include "threads/thread.c"
 
@@ -33,6 +35,12 @@ int sys_close(int fd);
 void copy_in (void *dest, void *src, size_t size);
 
 struct lock fs_lock;
+
+struct process_file {
+  struct file *file;
+  int fd;
+  struct list_elem elem;
+};
 
 void
 syscall_init (void) 
@@ -140,14 +148,43 @@ int sys_wait (int pid UNUSED) {
 	//return 0;
 	return process_wait(pid);
 }
-int sys_create (const char *file UNUSED, unsigned initial_size UNUSED) {
-	return 0;
+int sys_create (const char *file, unsigned initial_size) {
+	lock_acquire(&fs_lock);
+	bool result = filesys_create(file, initial_size);
+	lock_release(&fs_lock);
+	return result;
 }
 int sys_remove (const char *file UNUSED) {
 	return 0;
 }
-int sys_open (const char *file UNUSED) {
-	return 0;
+int sys_open (const char *file) {
+	lock_acquire(&fs_lock);
+	struct file *f = filesys_open(file);
+	
+	if(!f)
+	{
+		lock_release(&fs_lock);
+		return -1;
+	}
+	
+	// Add process_file struct to current thread's list of open files.
+	struct process_file *pf = malloc(sizeof(struct process_file));
+
+	// Set the process file property to the file we opened earlier.
+	pf->file = f;
+	pf->fd = thread_current()->fd;
+
+	// Increment the current thread's fd number for the next.
+	thread_current()->fd++;
+
+	// Puts process file struct on the current thread's list of open files. 
+  	list_push_back(&thread_current()->list_open_files, &pf->elem);
+
+	lock_release(&fs_lock);
+
+	// Return the file descriptor to the user. 
+  	return pf->fd;
+	
 }
 int sys_filesize(int fd UNUSED) {
 	return 0;
@@ -155,7 +192,8 @@ int sys_filesize(int fd UNUSED) {
 int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 	return 0;
 }
-int sys_write(int fd UNUSED, const void *buffer UNUSED, unsigned length UNUSED) {
+int sys_write(int fd, const void *buffer, unsigned length) {
+	
 	//return 0;
 	//putbuf(buffer, length);
 	//return length;
@@ -163,6 +201,8 @@ int sys_write(int fd UNUSED, const void *buffer UNUSED, unsigned length UNUSED) 
 		putbuf(buffer, length); //TODO: need to valid check all spots in buffer...
 		return length;
 	}
+
+	
 	/*lock_acquire(&fs_lock);
 	struct file *f = //find file
 	if (!f) {

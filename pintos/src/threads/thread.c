@@ -497,6 +497,9 @@ init_thread (struct thread *t, const char *name, int priority)
 	//3-8
 	list_init(&t->children);
 	//end 3-8
+
+  list_init(&t->list_open_files);
+  t->fd = 2;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

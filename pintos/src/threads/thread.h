@@ -106,7 +106,10 @@ struct thread
 		//3-8 for tracking child processes
 		struct list children;
 		struct wait_status *wait_status;
-		
+    
+    //3-10
+    struct list list_open_files;
+    int fd;
   };
 
 //3-8 wait_status struct to track completion of a process - came from ppt slides
@@ -124,6 +127,7 @@ struct wait_status {
 extern struct list all_list; //--moved from .c file  //formerly static not extern
 
 //end 3-8
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
