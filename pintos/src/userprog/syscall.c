@@ -103,7 +103,8 @@ void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) {
 		if (!is_user_vaddr(ptr)) {
 			//call sys_exit(ERROR) ? instead of thread_exit()?
 			printf("not in user space!\n");
-			thread_exit();
+			//thread_exit();
+			sys_exit(-1);
 		}
 		((int *)dest)[i] = *ptr;
 	}
@@ -114,7 +115,7 @@ void sys_halt (void) {
 }
 void sys_exit (int status) {
 	printf("%s: exit(%d)\n", thread_current()->name, status);
-	thread_current()->wait_status->exit_code = 0;
+	thread_current()->wait_status->exit_code = status; //3-10 check this is correct
 	thread_exit();
 }
 int sys_exec (const char *cmd_line) {
