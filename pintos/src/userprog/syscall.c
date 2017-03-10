@@ -13,6 +13,7 @@
 #include "process.h"
 #include "threads/malloc.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 //needed to access all_list -not sure if should move all_list to .h file
 //#include "threads/thread.c"
 
@@ -33,6 +34,7 @@ int sys_seek(int fd, unsigned pos);
 int sys_tell(int fd);
 int sys_close(int fd);
 void copy_in (void *dest, void *src, size_t size);
+struct file* get_file(int fd);
 
 struct lock fs_lock;
 
@@ -194,26 +196,21 @@ int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 }
 int sys_write(int fd, const void *buffer, unsigned length) {
 	
-	//return 0;
-	//putbuf(buffer, length);
-	//return length;
 	if (fd == STDOUT_FILENO) {
 		putbuf(buffer, length); //TODO: need to valid check all spots in buffer...
 		return length;
 	}
-
 	
-	/*lock_acquire(&fs_lock);
-	struct file *f = //find file
+	lock_acquire(&fs_lock);
+
+	struct file *f = get_file(fd);
 	if (!f) {
 		lock_release(&fs_lock);
-		return ERROR;
+		return -1;
 	}
 	int bytes = file_write(f, buffer, length);
 	lock_release(&fs_lock);
-	return bytes;*/
-	//temp
-	return length;
+	return bytes;
 	
 }
 int sys_seek(int fd UNUSED, unsigned pos UNUSED) {
@@ -225,6 +222,30 @@ int sys_tell(int fd UNUSED) {
 int sys_close(int fd UNUSED) {
 	return 0;
 }
+
+struct file* get_file(int fd){
+	struct thread *t = thread_current();
+	struct list_elem *e;
+	
+	for (e = list_begin (&t->list_open_files); e != list_end (&t->list_open_files); e = list_next (e))       
+        {
+          struct process_file *process_file = list_entry (e, struct process_file, elem);
+
+          if (fd == process_file->fd)
+	  {
+	      return process_file->file;
+	  }
+        }
+  return NULL;
+}
+
+
+
+
+
+
+
+
 
 
 
