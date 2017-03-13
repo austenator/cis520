@@ -28,7 +28,7 @@ void sys_exit (int status);
 int sys_exec (const char *cmd_line);
 int sys_wait (int pid);
 int sys_create (const char *file, unsigned initial_size);
-int sys_remove (const char *file);
+bool sys_remove (const char *file);
 int sys_open (const char *file);
 int sys_filesize(int fd);
 int sys_read(int td, void *buffer, unsigned size);
@@ -170,8 +170,11 @@ int sys_create (const char *file, unsigned initial_size) {
 	lock_release(&fs_lock);
 	return result;
 }
-int sys_remove (const char *file UNUSED) {
-	return 0;
+bool sys_remove (const char *file) {
+	lock_acquire(&fs_lock);
+  	bool success = filesys_remove(file);
+  	lock_release(&fs_lock);
+  	return success;
 }
 int sys_open (const char *file) {
 	lock_acquire(&fs_lock);
@@ -213,10 +216,6 @@ int sys_filesize(int fd UNUSED) {
 	lock_release(&fs_lock);
 	return length;
 }
-//int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
-//	return 0;
-//}
-
 
 int sys_read (int fd, void *buffer, unsigned size)
 {
