@@ -292,33 +292,11 @@ unsigned sys_tell(int fd) {
 void sys_close(int fd) {
 	lock_acquire(&fs_lock);
 	
-	//struct thread *curr_thread = thread_current();
-	//struct list_elem *curr_elem;// = list_begin(&curr_thread->list_open_files);
-	//struct process_file *pf;
-	
-	//struct thread *t = thread_current();
-  	//struct list_elem *next, *e = list_begin(&t->list_open_files);
-/*
-  while (e != list_end (&t->list_open_files))
-    {
-      next = list_next(e);
-      struct process_file *pf = list_entry (e, struct process_file, elem);
-      if (fd == pf->fd || fd == CLOSE_ALL)
-	{
-	  file_close(pf->file);
-	  list_remove(&pf->elem);
-	  free(pf);
-	  if (fd != CLOSE_ALL)
-	    {
-	      return;
-	    }
-	}
-      e = next;
-    }*/
+	struct thread *curr_thread = thread_current();
+	struct list_elem *curr_elem;// = list_begin(&curr_thread->list_open_files);
+	struct process_file *pf;
 
-
-
-	/*for(curr_elem = list_begin(&curr_thread->list_open_files); curr_elem != list_end (&curr_thread->list_open_files); curr_elem = list_next(curr_elem)){
+	for(curr_elem = list_begin(&curr_thread->list_open_files); curr_elem != list_end (&curr_thread->list_open_files); curr_elem = list_next(curr_elem)){
 		pf = list_entry(curr_elem, struct process_file, elem);
 		if (fd == pf->fd || fd == CLOSE_ALL)
 		{
@@ -326,10 +304,11 @@ void sys_close(int fd) {
 			list_remove(&pf->elem);
 			free(pf);
 			if (fd != CLOSE_ALL){
+				lock_release(&fs_lock);
 				return;
 			}
 		}
-	}*/
+	}
 	
 	lock_release(&fs_lock);
 }
