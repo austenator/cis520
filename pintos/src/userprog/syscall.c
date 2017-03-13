@@ -171,6 +171,10 @@ int sys_remove (const char *file UNUSED) {
 }
 int sys_open (const char *file) {
 	lock_acquire(&fs_lock);
+	if (!pagedir_get_page(thread_current()->pagedir ,file)) 
+	{
+		sys_exit(-1);
+	}
 	struct file *f = filesys_open(file);
 	
 	if(!f)
