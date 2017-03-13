@@ -204,7 +204,7 @@ process_exit (void)
 			free(cur->wait_status);
 		} else {
 			lock_release(&cur->wait_status->lock);
-			if (!cur->wait_status->exit_code) //TODO: check if not equal to zero..might init to -2
+			if (cur->wait_status->exit_code == -2) //TODO: check if not equal to zero..might init to -2
 			{
 				cur->wait_status->exit_code = -1;
 			}

@@ -215,7 +215,7 @@ thread_create (const char *name, int priority,
 	lock_init(&t->wait_status->lock);
 	t->wait_status->ref_cnt = 2;
 	t->wait_status->tid = tid;
-	t->wait_status->exit_code = NULL; //TODO: this equates to zero not what I want. try -2
+	t->wait_status->exit_code = -2; //TODO: this equates to zero not what I want. try -2
 	sema_init(&t->wait_status->dead, 0); //init to zero so basically like a lock
 	//because process_execute doesn't create thread with correct name (includes args)
 	char delim = ' ';
