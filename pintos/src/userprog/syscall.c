@@ -33,8 +33,8 @@ int sys_open (const char *file);
 int sys_filesize(int fd);
 int sys_read(int td, void *buffer, unsigned size);
 int sys_write(int fd, const void *buffer, unsigned length);
-int sys_seek(int fd, unsigned pos);
-int sys_tell(int fd);
+void sys_seek(int fd, unsigned pos);
+unsigned sys_tell(int fd);
 void sys_close(int fd);
 void copy_in (void *dest, void *src, size_t size);
 struct file* get_file(int fd);
@@ -203,7 +203,11 @@ int sys_open (const char *file) {
 	
 }
 int sys_filesize(int fd UNUSED) {
-	return 0;
+	lock_acquire(&fs_lock);
+	struct file *f = get_file(fd);
+	off_t length = file_length(f);
+	lock_release(&fs_lock);
+	return length;
 }
 //int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 //	return 0;
@@ -253,11 +257,29 @@ int sys_write(int fd, const void *buffer, unsigned length) {
 	return bytes;
 	
 }
-int sys_seek(int fd UNUSED, unsigned pos UNUSED) {
-	return 0;
+void sys_seek(int fd, unsigned pos) {
+  lock_acquire(&fs_lock);
+  struct file *f = get_file(fd);
+  if (!f)
+    {
+      lock_release(&fs_lock);
+      return;
+    }
+  file_seek(f, pos);
+  lock_release(&fs_lock);
 }
-int sys_tell(int fd UNUSED) {
-	return 0;
+
+unsigned sys_tell(int fd) {
+  lock_acquire(&fs_lock);
+  struct file *f = get_file(fd);
+  if (!f)
+    {
+      lock_release(&fs_lock);
+      return -1;
+    }
+  off_t position = file_tell(f);
+  lock_release(&fs_lock);
+  return position;
 }
 void sys_close(int fd) {
 	lock_acquire(&fs_lock);
