@@ -14,6 +14,7 @@
 #include "threads/malloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "pagedir.h"
 //needed to access all_list -not sure if should move all_list to .h file
 //#include "threads/thread.c"
 
@@ -118,6 +119,9 @@ void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) {
 			//thread_exit();
 			sys_exit(-1);
 		}
+		if (!pagedir_get_page(thread_current()->pagedir, ptr)) {
+			sys_exit(-1);
+		}
 		((int *)dest)[i] = *ptr;
 	}
 }
@@ -154,6 +158,10 @@ int sys_wait (int pid UNUSED) {
 }
 int sys_create (const char *file, unsigned initial_size) {
 	lock_acquire(&fs_lock);
+	if (!pagedir_get_page(thread_current()->pagedir ,file)) 
+	{
+		sys_exit(-1);
+	}
 	bool result = filesys_create(file, initial_size);
 	lock_release(&fs_lock);
 	return result;
