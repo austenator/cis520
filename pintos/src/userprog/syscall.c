@@ -135,6 +135,10 @@ void sys_exit (int status) {
 	thread_exit();
 }
 int sys_exec (const char *cmd_line) {
+	if (!pagedir_get_page(thread_current()->pagedir, cmd_line))
+	{
+			sys_exit(-1);
+	}
 	pid_t pid = process_execute(cmd_line);
 	//add newly created thread/process to my list of children
 	//struct list_elem *e;
@@ -228,7 +232,7 @@ int sys_read (int fd, void *buffer, unsigned size)
     }
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
-  if (!f)
+  if (!f )
     {
       lock_release(&fs_lock);
       return -1;
@@ -251,6 +255,10 @@ int sys_write(int fd, const void *buffer, unsigned length) {
 	if (!f) {
 		lock_release(&fs_lock);
 		return -1;
+	}
+	if (!pagedir_get_page(thread_current()->pagedir, buffer))
+	{
+			sys_exit(-1);
 	}
 	int bytes = file_write(f, buffer, length);
 	lock_release(&fs_lock);
