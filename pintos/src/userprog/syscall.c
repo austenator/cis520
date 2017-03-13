@@ -19,7 +19,7 @@
 
 //3-10
 #define USER_VADDR_BOTTOM ((void *) 0x08048000 //taken from memory layout description in proj2.pdf
-
+#define CLOSE_ALL -1
 static void syscall_handler (struct intr_frame *);
 
 void sys_halt (void);
@@ -34,7 +34,7 @@ int sys_read(int td, void *buffer, unsigned size);
 int sys_write(int fd, const void *buffer, unsigned length);
 int sys_seek(int fd, unsigned pos);
 int sys_tell(int fd);
-int sys_close(int fd);
+void sys_close(int fd);
 void copy_in (void *dest, void *src, size_t size);
 struct file* get_file(int fd);
 
@@ -193,9 +193,35 @@ int sys_open (const char *file) {
 int sys_filesize(int fd UNUSED) {
 	return 0;
 }
-int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
-	return 0;
+//int sys_read(int td UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
+//	return 0;
+//}
+
+
+int sys_read (int fd, void *buffer, unsigned size)
+{
+  if (fd == 0)
+    {
+      unsigned i;
+      uint8_t* local_buffer = (uint8_t *) buffer;
+      for (i = 0; i < size; i++)
+	{
+	  local_buffer[i] = input_getc();
+	}
+      return size;
+    }
+  lock_acquire(&fs_lock);
+  struct file *f = get_file(fd);
+  if (!f)
+    {
+      lock_release(&fs_lock);
+      return -1;
+    }
+  int bytes = file_read(f, buffer, size);
+  lock_release(&fs_lock);
+  return bytes;
 }
+
 int sys_write(int fd, const void *buffer, unsigned length) {
 	
 	if (fd == STDOUT_FILENO) {
@@ -221,8 +247,49 @@ int sys_seek(int fd UNUSED, unsigned pos UNUSED) {
 int sys_tell(int fd UNUSED) {
 	return 0;
 }
-int sys_close(int fd UNUSED) {
-	return 0;
+void sys_close(int fd) {
+	lock_acquire(&fs_lock);
+	
+	//struct thread *curr_thread = thread_current();
+	//struct list_elem *curr_elem;// = list_begin(&curr_thread->list_open_files);
+	//struct process_file *pf;
+	
+	//struct thread *t = thread_current();
+  	//struct list_elem *next, *e = list_begin(&t->list_open_files);
+/*
+  while (e != list_end (&t->list_open_files))
+    {
+      next = list_next(e);
+      struct process_file *pf = list_entry (e, struct process_file, elem);
+      if (fd == pf->fd || fd == CLOSE_ALL)
+	{
+	  file_close(pf->file);
+	  list_remove(&pf->elem);
+	  free(pf);
+	  if (fd != CLOSE_ALL)
+	    {
+	      return;
+	    }
+	}
+      e = next;
+    }*/
+
+
+
+	/*for(curr_elem = list_begin(&curr_thread->list_open_files); curr_elem != list_end (&curr_thread->list_open_files); curr_elem = list_next(curr_elem)){
+		pf = list_entry(curr_elem, struct process_file, elem);
+		if (fd == pf->fd || fd == CLOSE_ALL)
+		{
+			file_close(pf->file);
+			list_remove(&pf->elem);
+			free(pf);
+			if (fd != CLOSE_ALL){
+				return;
+			}
+		}
+	}*/
+	
+	lock_release(&fs_lock);
 }
 
 struct file* get_file(int fd){
