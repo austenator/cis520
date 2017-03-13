@@ -219,16 +219,26 @@ int sys_filesize(int fd UNUSED) {
 
 int sys_read (int fd, void *buffer, unsigned size)
 {
-  if (fd == 0)
-    {
-      unsigned i;
-      uint8_t* local_buffer = (uint8_t *) buffer;
-      for (i = 0; i < size; i++)
+	if (!is_user_vaddr(buffer)|| buffer < (int *)USER_VADDR_BOTTOM)) {
+			//call sys_exit(ERROR) ? instead of thread_exit()?
+			//printf("not in user space!\n");
+			//thread_exit();
+			sys_exit(-1);
+		}
+	if (!pagedir_get_page(thread_current()->pagedir, buffer))
 	{
-	  local_buffer[i] = input_getc();
+			sys_exit(-1);
 	}
-      return size;
-    }
+  if (fd == 0)
+  {
+    unsigned i;
+    uint8_t* local_buffer = (uint8_t *) buffer;
+    for (i = 0; i < size; i++)
+		{
+		  local_buffer[i] = input_getc();
+		}
+    return size;
+  }
   lock_acquire(&fs_lock);
   struct file *f = get_file(fd);
   if (!f )
