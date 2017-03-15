@@ -249,7 +249,7 @@ with the thread, and child list of wait structs).
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
-No idea.
+After the new child is created, the parent calls semadown on the child's waitstatus->load which has been initialized to 0. This blocks the parent process until the child completes loading and signals the parent. Before the child calls semaup it sets the successful_load bool in the wait status to true/false based on the success of it loading. This is the field the parent checks after the parent wakes up to see if the child loaded successfully and returns the tid or -1 accordingly. 
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
