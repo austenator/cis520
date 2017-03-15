@@ -15,10 +15,9 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "pagedir.h"
-//needed to access all_list -not sure if should move all_list to .h file
-//#include "threads/thread.c"
 
-//3-10
+
+//
 #define USER_VADDR_BOTTOM ((void *) 0x08048000 //taken from memory layout description in proj2.pdf
 #define CLOSE_ALL -1
 static void syscall_handler (struct intr_frame *);
@@ -56,9 +55,7 @@ syscall_init (void)
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
-{
-  //printf ("system call!\n");
-
+{ //code for this method came from slides
   typedef int syscall_function (int, int, int);
 
   /* A system call. */   
@@ -77,7 +74,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 		{2, (syscall_function *) sys_create},       
 		{1, (syscall_function *) sys_remove},       
 		{1, (syscall_function *) sys_open},
-		// need to put the rest in
 		{1, (syscall_function *) sys_filesize},
 		{3, (syscall_function *) sys_read},
 		{3, (syscall_function *) sys_write},
@@ -103,26 +99,22 @@ syscall_handler (struct intr_frame *f UNUSED)
 	
 	/* Execute the system call,      and set the return value. */   
 	f->eax = sc->func (args[0], args[1], args[2]);
-  //}
-  //thread_exit ();
+
 }
 
-void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) {
-	//*(char *)dest = *(char *)src;
+void copy_in (void *dest UNUSED, void *src UNUSED, size_t size UNUSED) 
+{ //src points to the stack, size = 4*(#arguments we are copying)
 	int i;
 	int *ptr;
-	for (i = 0; i<(size/4); i++) {
-		ptr = (int *) src + i;
-		if (!is_user_vaddr(ptr)|| ptr < (int *)USER_VADDR_BOTTOM)) {
-			//call sys_exit(ERROR) ? instead of thread_exit()?
-			//printf("not in user space!\n");
-			//thread_exit();
+	for (i = 0; i<(size/4); i++) { //divide by 4 because i goes by 4 bytes since its an integer
+		ptr = (int *) src + i; //ptr now points to stack, we save it in ptr so we can run checks if it is valid
+		if (!is_user_vaddr(ptr)|| ptr < (int *)USER_VADDR_BOTTOM)) { // bad/invalid ptr check
 			sys_exit(-1);
 		}
-		if (!pagedir_get_page(thread_current()->pagedir, ptr)) {
+		if (!pagedir_get_page(thread_current()->pagedir, ptr)) { // bad/invalid ptr check
 			sys_exit(-1);
 		}
-		((int *)dest)[i] = *ptr;
+		((int *)dest)[i] = *ptr; //here is where the actual copying from stack to kernel space happens
 	}
 }
 
@@ -131,33 +123,37 @@ void sys_halt (void) {
 }
 void sys_exit (int status) {
 	printf("%s: exit(%d)\n", thread_current()->name, status);
-	thread_current()->wait_status->exit_code = status; //3-10 check this is correct
+	thread_current()->wait_status->exit_code = status; //set my exit code then exit
 	thread_exit();
 }
 int sys_exec (const char *cmd_line) {
-	if (!pagedir_get_page(thread_current()->pagedir, cmd_line))
+	if (!is_user_vaddr(cmd_line)|| cmd_line < (int *)USER_VADDR_BOTTOM)) {
+			sys_exit(-1);
+		}	
+	if (!pagedir_get_page(thread_current()->pagedir, cmd_line))   //more bad ptr checks
 	{
 			sys_exit(-1);
 	}
-	pid_t pid = process_execute(cmd_line);
-	//add newly created thread/process to my list of children
-	//struct list_elem *e;
-	//struct thread *t;
-	//struct thread *cur = thread_current();
-	//for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next(e))
-	//{
-	//	t = list_entry(e, struct thread, allelem);
-	//	if (t->wait_status->tid == pid)
-	//	{
-	//		list_push_back(&cur->children, &t->wait_status->elem);
-	//		break;
-	//	}
-	//} //do all this in process_execute?
-	//list_push_back(&thread_current()->children, &LISTELEM);
+	pid_t pid = process_execute(cmd_line); //execute process
+	struct thread *cur = thread_current();
+	struct list_elem *e;
+	struct wait_status *w;
+	for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e)) 
+	{ //find the child process that we just created
+		w = list_entry(e, struct wait_status, elem);
+		if (w->tid==pid)
+		{
+			sema_down(&w->loaded); //block until child has fully loaded, then check successful_load
+			if (!w->successful_load) //if not successful load, return -1 instead of its tid
+			{
+				pid = -1;
+			}
+			break;
+		}
+	}
 	return pid;
 }
 int sys_wait (int pid UNUSED) {
-	//return 0;
 	return process_wait(pid);
 }
 int sys_create (const char *file, unsigned initial_size) {
@@ -177,11 +173,15 @@ bool sys_remove (const char *file) {
   	return success;
 }
 int sys_open (const char *file) {
-	lock_acquire(&fs_lock);
+	if (!is_user_vaddr(file)|| file < (int *)USER_VADDR_BOTTOM))
+	{
+			sys_exit(-1);
+	}	
 	if (!pagedir_get_page(thread_current()->pagedir ,file)) 
 	{
 		sys_exit(-1);
 	}
+	lock_acquire(&fs_lock);
 	struct file *f = filesys_open(file);
 	
 	if(!f)
@@ -219,12 +219,10 @@ int sys_filesize(int fd UNUSED) {
 
 int sys_read (int fd, void *buffer, unsigned size)
 {
-	if (!is_user_vaddr(buffer)|| buffer < (int *)USER_VADDR_BOTTOM)) {
-			//call sys_exit(ERROR) ? instead of thread_exit()?
-			//printf("not in user space!\n");
-			//thread_exit();
+	if (!is_user_vaddr(buffer)|| buffer < (int *)USER_VADDR_BOTTOM)) 
+	{
 			sys_exit(-1);
-		}
+	}
 	if (!pagedir_get_page(thread_current()->pagedir, buffer))
 	{
 			sys_exit(-1);
@@ -254,20 +252,25 @@ int sys_read (int fd, void *buffer, unsigned size)
 int sys_write(int fd, const void *buffer, unsigned length) {
 	
 	if (fd == STDOUT_FILENO) {
-		putbuf(buffer, length); //TODO: need to valid check all spots in buffer...
+		putbuf(buffer, length);
 		return length;
 	}
 	
+	if (!is_user_vaddr(buffer)|| buffer < (int *)USER_VADDR_BOTTOM)) 
+	{
+		sys_exit(-1);
+	}
+	if (!pagedir_get_page(thread_current()->pagedir, buffer))
+	{
+			sys_exit(-1);
+	}
+
 	lock_acquire(&fs_lock);
 
 	struct file *f = get_file(fd);
 	if (!f) {
 		lock_release(&fs_lock);
 		return -1;
-	}
-	if (!pagedir_get_page(thread_current()->pagedir, buffer))
-	{
-			sys_exit(-1);
 	}
 	int bytes = file_write(f, buffer, length);
 	lock_release(&fs_lock);
@@ -302,17 +305,19 @@ void sys_close(int fd) {
 	lock_acquire(&fs_lock);
 	
 	struct thread *curr_thread = thread_current();
-	struct list_elem *curr_elem;// = list_begin(&curr_thread->list_open_files);
+	struct list_elem *curr_elem;
 	struct process_file *pf;
 
-	for(curr_elem = list_begin(&curr_thread->list_open_files); curr_elem != list_end (&curr_thread->list_open_files); curr_elem = list_next(curr_elem)){
+	for(curr_elem = list_begin(&curr_thread->list_open_files); curr_elem != list_end (&curr_thread->list_open_files); curr_elem = list_next(curr_elem))
+	{
 		pf = list_entry(curr_elem, struct process_file, elem);
 		if (fd == pf->fd || fd == CLOSE_ALL)
 		{
 			file_close(pf->file);
 			list_remove(&pf->elem);
 			free(pf);
-			if (fd != CLOSE_ALL){
+			if (fd != CLOSE_ALL)
+			{
 				lock_release(&fs_lock);
 				return;
 			}
@@ -327,14 +332,14 @@ struct file* get_file(int fd){
 	struct list_elem *e;
 	
 	for (e = list_begin (&t->list_open_files); e != list_end (&t->list_open_files); e = list_next (e))       
-        {
-          struct process_file *process_file = list_entry (e, struct process_file, elem);
+  {
+      struct process_file *process_file = list_entry (e, struct process_file, elem);
 
-          if (fd == process_file->fd)
-	  {
+      if (fd == process_file->fd)
+		  {
 	      return process_file->file;
-	  }
-        }
+		  }
+  }
   return NULL;
 }
 

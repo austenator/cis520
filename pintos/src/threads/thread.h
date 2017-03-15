@@ -115,11 +115,13 @@ struct thread
 //3-8 wait_status struct to track completion of a process - came from ppt slides
 struct wait_status {
 	struct list_elem elem;
-	struct lock lock;
-	int ref_cnt;
-	tid_t tid;
-	int exit_code;
-	struct semaphore dead;
+	struct lock lock; //to protect ref_cnt shared variable
+	int ref_cnt; //keeps track of num of live processes still referencing this struct
+	tid_t tid; //tid of associated thread
+	int exit_code; //exit code of associated thread
+	struct semaphore dead; //so parent can block when it calls wait(pid)
+	struct semaphore loaded; //for parent process to wait until loaded to return pid in sys_exec
+	bool successful_load;	 //tracks whether process/thread loaded succesfully
 };
 
 /* List of all processes.  Processes are added to this list

@@ -89,7 +89,8 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-			sys_exit(-1);
+			//
+			sys_exit(-1); //so that appropriate tracking structs know why this process was killed (-1 means kernel killed it)
       //thread_exit (); 
 
     case SEL_KCSEG:
@@ -106,7 +107,7 @@ kill (struct intr_frame *f)
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
       //thread_exit ();
-			sys_exit(-1);
+			sys_exit(-1); //so that appropriate tracking structs know why this process was killed (-1 means kernel killed it)
     }
 }
 

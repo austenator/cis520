@@ -210,13 +210,14 @@ thread_create (const char *name, int priority,
   intr_set_level (old_level);
 
 	//3-8 initialize structs that are helping keep track of child processes
-	//list_init(&t->children); //-done in init_thread func because main thread doesn't go thru this method
 	t->wait_status = malloc(sizeof(struct wait_status));
 	lock_init(&t->wait_status->lock);
 	t->wait_status->ref_cnt = 2;
 	t->wait_status->tid = tid;
-	t->wait_status->exit_code = -2; //TODO: this equates to zero not what I want. try -2
-	sema_init(&t->wait_status->dead, 0); //init to zero so basically like a lock
+	t->wait_status->exit_code = -2; //-2 because can't init to zero since zero means exited fine
+	sema_init(&t->wait_status->dead, 0);
+	sema_init(&t->wait_status->loaded, 0); 
+	t->wait_status->successful_load = false;
 	//because process_execute doesn't create thread with correct name (includes args)
 	char delim = ' ';
 	char *space = strchr(t->name, delim);
@@ -224,8 +225,7 @@ thread_create (const char *name, int priority,
 	{
 		space[0] = '\0';
 	}
-	
-	//list_push_back(&thread_current()->children, &t->wait_status->elem);
+
 	//end 3-8
 	
 
@@ -496,10 +496,9 @@ init_thread (struct thread *t, const char *name, int priority)
 	
 	//3-8
 	list_init(&t->children);
-	//end 3-8
-
-  list_init(&t->list_open_files);
+  list_init(&t->list_open_files); //these done here because main thread doesn't go through thread_create
   t->fd = 2;
+	//end 3-8 
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

@@ -45,12 +45,12 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
 	
-	//code taken from sys_exec to keep track of child process
+	//adds new process to current thread's children list
 	struct list_elem *e;
 	struct thread *t;
 	struct thread *cur = thread_current();
 	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next(e))
-	{
+	{ //loops through all threads to find the newly created one and adds it to children list
 		t = list_entry(e, struct thread, allelem);
 		if (t->tid == tid)
 		{
@@ -71,7 +71,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-	//
+	// --used for argument passing
 	int argc, i;
 	char *token, *save_ptr;
 	void *start;
@@ -83,26 +83,31 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-	//
+
+	// argument passing
 	argc = 0;
-	argv_off = malloc(32 * sizeof(int)); //handle this later...if it comes back unitialized
-	file_name_len = strlen(file_name) + 1;
+	argv_off = malloc(32 * sizeof(int));
+	file_name_len = strlen(file_name) + 1; //save full length before spaces changed to null chars
 	argv_off[0] = 0;
 	for (token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr) ) {
-		argv_off[argc] = token - file_name;
-		argc++;
+		argv_off[argc] = token - file_name; //this loop puts null chars in the file_name and
+		argc++;															//saves the offsets of each arg from front of filename string
 	}
 	//
+
   success = load (file_name, &if_.eip, &if_.esp);
 	
 	//
 	if (success) {
-		if_.esp -= file_name_len; //strlen(file_name) + 1;
+		thread_current()->wait_status->successful_load = true; //tell parent we loaded successfully
+		sema_up(&thread_current()->wait_status->loaded); //tell sys_exec parent that process has loaded
+		
+		if_.esp -= file_name_len;
 		start = if_.esp;
-		memcpy (if_.esp, file_name,file_name_len /*strlen(file_name) + 1*/);
-		if_.esp -= 4 - (strlen(file_name) + 1) % 4;
+		memcpy (if_.esp, file_name,file_name_len); //push data on the stack
+		if_.esp -= 4 - (strlen(file_name) + 1) % 4; //do the 4-bit alignment
 		if_.esp -= 4;
-		*(int *)(if_.esp) = 0; //argv[argc] = 0;
+		*(int *)(if_.esp) = 0; //argv[argc] = 0; 
 		
 		for (i = argc-1; i>=0; i--) {
 			if_.esp -= 4;
@@ -111,9 +116,11 @@ start_process (void *file_name_)
 		if_.esp -= 4;
 		*(char **)(if_.esp) = (if_.esp + 4); //push pointer to argv array
 		if_.esp -= 4;
-		*(int *)(if_.esp) = argc;
+		*(int *)(if_.esp) = argc; //push arg count
 		if_.esp -= 4;
 		*(int *)(if_.esp) = 0; //fake return address
+	} else { //if load of new process failed, stil tell parent that we are done (trying) to load and it is safe to check the successful_load bool
+		sema_up(&thread_current()->wait_status->loaded);
 	}
 
 	free (argv_off);
@@ -155,18 +162,14 @@ process_wait (tid_t child_tid UNUSED)
 		s = list_entry(e, struct wait_status, elem);
 		if (s->tid == child_tid)
 		{
-			sema_down(&s->dead);
-			status = s->exit_code;
-			list_remove(&s->elem);
+			sema_down(&s->dead); //block until child is dead
+			status = s->exit_code; //if here, child is dead and can check what it exited with
+			list_remove(&s->elem); //this is how we handle keeping a parent from waiting on a child more than once
 			free(s);
 			break;
 		}
 	}
 	
-	//while (true) { 
-  //
-	//}  	
-	//return -1;
 	return status;
 }
 
@@ -177,39 +180,39 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-	//3-8
+	//
 	struct list_elem *e;
+	struct list_elem *holder;
 	struct wait_status *s;
-	for (e = list_begin (&cur->children); e != list_end (&cur->children); e = list_next(e))
-	{
+	for (e = list_begin (&cur->children); e != list_end (&cur->children); )
+	{ //loops over all children and lets them know by way of ref_cnt that their parent is dead/dying
+		holder = list_next(e);
 		s = list_entry(e, struct wait_status, elem);
-		lock_acquire(&s->lock);
+		lock_acquire(&s->lock); //acquires lock to protect shared variable ref_cnt
 		s->ref_cnt--;
-		if (s->ref_cnt == 0)
+		if (s->ref_cnt == 0) //if ==0, parent and child are dead and we can free this struct
 		{
-			//lock_release(&s->lock);//need this?
 			list_remove(&s->elem);
 			free(s);
 		} else {
 			lock_release(&s->lock);
 		}
+		e = holder;
 	}
-	if (cur->tid != 1)
+	if (cur->tid != 1) //main thread has tid 1
 	{
 		lock_acquire(&cur->wait_status->lock);
 		cur->wait_status->ref_cnt--;
-		if (cur->wait_status->ref_cnt == 0 ) //both are dead and no one needs a reference to this wait_status anymore
+		if (cur->wait_status->ref_cnt == 0 ) //both are dead and no one needs a reference to this wait_status anymore so we can free it
 		{
-			//lock_release(&cur->wait_status->lock);
 			free(cur->wait_status);
 		} else {
 			lock_release(&cur->wait_status->lock);
-			if (cur->wait_status->exit_code == -2) //TODO: check if not equal to zero..might init to -2
-			{
+			if (cur->wait_status->exit_code == -2) //if still -2, my exit code hasn't been set anywhere
+			{	//else so I must have been killed by the kernel
 				cur->wait_status->exit_code = -1;
 			}
-			//needs to be done last so if parent is waiting, doesn't start too soon
-			sema_up(&cur->wait_status->dead); 
+			sema_up(&cur->wait_status->dead); //tells parent (parent now wakes up) that child is now dead
 		}
 	}
 	
@@ -555,7 +558,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;// - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
