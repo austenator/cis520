@@ -51,7 +51,8 @@ page_for_addr (const void *address)
         return hash_entry (e, struct page, hash_elem);
 
       /* No page.  Expand stack? */
-
+			if ((thread_current()->user_esp - address) < 32 && address > (PHYS_BASE - STACK_MAX))
+				return page_allocate(address, false);
 /* add code */
 
     }
@@ -136,6 +137,7 @@ page_out (struct page *p)
 {
   bool dirty;
   bool ok = false;
+	int bytes_written;
 
   ASSERT (p->frame != NULL);
   ASSERT (lock_held_by_current_thread (&p->frame->lock));
@@ -146,12 +148,39 @@ page_out (struct page *p)
      page. */
 
 /* add code here */
+		pagedir_clear_page(thread_current()->pages, p);
+			//Marks user virtual page UPAGE "not present" in page directory PD.  Later accesses to the page will fault.
 
   /* Has the frame been modified? */
+		dirty = pagedir_is_dirty(thread_current()->pages, p); //func from pagedir.c
 
 /* add code here */
 
   /* Write frame contents to disk if necessary. */
+		//if (!dirty) //just overwrite
+		//else write out
+				//if (p->private) write to swap
+				//else write to disk because has been mmapped
+		if (dirty) 
+		{
+			if (!p->private) 
+			{ //write to file
+				if (p->file != NULL) 
+				{
+					bytes_written = file_write_at(p->file, p->frame->base, p->file_bytes, p->file_offset);
+				}
+				//ok = swap_out(p);
+				//if (ok)
+				//	p->frame = NULL;
+			}
+			else
+			{ //write to swap partition
+				ok = swap_out(p);
+				if (ok)
+					p->frame = NULL;
+			}
+		}
+		
 
 /* add code here */
 

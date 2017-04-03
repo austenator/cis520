@@ -74,6 +74,10 @@ swap_out (struct page *p)
   p->sector = slot * PAGE_SECTORS;
 
   // Write out page sectors
+	for (i = 0; i < PAGE_SECTORS; i++) //same as in swap_in func but uses block_write instead
+	{
+		block_write (swap_device, p->sector + i, p->frame->base + i * BLOCK_SECTOR_SIZE);
+	}
 /* add code here */ 
  
   p->private = false;
