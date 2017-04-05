@@ -148,11 +148,11 @@ page_out (struct page *p)
      page. */
 
 /* add code here */
-		pagedir_clear_page(thread_current()->pages, p);
+		pagedir_clear_page(p->thread->pagedir, p->addr);
 			//Marks user virtual page UPAGE "not present" in page directory PD.  Later accesses to the page will fault.
 
   /* Has the frame been modified? */
-		dirty = pagedir_is_dirty(thread_current()->pages, p); //func from pagedir.c
+		dirty = pagedir_is_dirty(p->thread->pagedir, p->frame->base); //func from pagedir.c
 
 /* add code here */
 
@@ -169,9 +169,9 @@ page_out (struct page *p)
 				{
 					bytes_written = file_write_at(p->file, p->frame->base, p->file_bytes, p->file_offset);
 				}
-				//ok = swap_out(p);
-				//if (ok)
-				//	p->frame = NULL;
+				ok = swap_out(p); 	//
+				if (ok)							// --these correspond to page-linear,parallel,merge-seq,merge-stk,merge-mm
+					p->frame = NULL;	//			 tests.
 			}
 			else
 			{ //write to swap partition

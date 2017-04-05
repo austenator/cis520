@@ -475,7 +475,7 @@ struct mapping
     struct list_elem elem;      /* List element. */
     int handle;                 /* Mapping id. */
     struct file *file;          /* File. */
-    uint8_t *base;              /* Start of memory mapping. */
+    uint8_t *base;              /* Start of memory mapping. */ //is the virtual addr
     size_t page_cnt;            /* Number of pages mapped. */
   };
 
@@ -505,6 +505,25 @@ static void
 unmap (struct mapping *m) 
 {
 /* add code here */
+	//file_seek(m->file, m->base);
+	int i;
+	lock_acquire(&fs_lock);
+	m->file = file_reopen(m->file);
+	lock_release(&fs_lock);
+	for (i = 0; i<m->page_cnt; i++)
+	{
+		if (pagedir_is_dirty(thread_current()->pagedir, m->base + (i * PGSIZE) ))
+		{
+			//int bytes_writeen = file_write_at(m->file, m->base, 
+			//p->file, p->frame->base, p->file_bytes, p->file_offset
+			page_deallocate(m->base + (i * PGSIZE));
+		}
+	}
+	lock_acquire(&fs_lock);
+	file_close(m->file);
+	lock_release(&fs_lock);
+	list_remove(&m->elem);
+	free(m);	
 }
  
 /* Mmap system call. */
@@ -561,6 +580,10 @@ static int
 sys_munmap (int mapping) 
 {
 /* add code here */
+	struct mapping *m = lookup_mapping(mapping);
+	if(m==NULL)
+		return -1;
+	unmap(m);
 
   return 0;
 }
