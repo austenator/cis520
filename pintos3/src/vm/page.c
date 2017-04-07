@@ -52,7 +52,7 @@ page_for_addr (const void *address)
 
       /* No page.  Expand stack? */
 			if ((thread_current()->user_esp - address) < 32 && address > (PHYS_BASE - STACK_MAX))
-				return page_allocate(address, false);
+				return page_allocate(address, false); //our heuristic to determine if this "appears" to be a stack access - if within 32 bits(bytes?) of stack pointer and if allocating another page would keep the total stack size within the max size allowed for stacks, then allocate another page for the stack
 /* add code */
 
     }
@@ -146,43 +146,26 @@ page_out (struct page *p)
      process to fault.  This must happen before checking the
      dirty bit, to prevent a race with the process dirtying the
      page. */
-
-/* add code here */
 		pagedir_clear_page(p->thread->pagedir, p->addr);
 			//Marks user virtual page UPAGE "not present" in page directory PD.  Later accesses to the page will fault.
 
   /* Has the frame been modified? */
 		dirty = pagedir_is_dirty(p->thread->pagedir, p->frame->base); //func from pagedir.c
 
-/* add code here */
-
   /* Write frame contents to disk if necessary. */
-		//if (!dirty) //just overwrite
-		//else write out
-				//if (p->private) write to swap
-				//else write to disk because has been mmapped
-		if (dirty) 
+		if (dirty) //only write out dirty pages (doesn't work for mmap-clean test?)
 		{
 			if (!p->private) 
 			{ //write to file
-				if (p->file != NULL) 
+				if (!p->file == NULL) 
 				{
 					bytes_written = file_write_at(p->file, p->frame->base, p->file_bytes, p->file_offset);
 				}
-				ok = swap_out(p); 	//
-				if (ok)							// --these correspond to page-linear,parallel,merge-seq,merge-stk,merge-mm
-					p->frame = NULL;	//			 tests.
 			}
-			else
-			{ //write to swap partition
-				ok = swap_out(p);
+			ok = swap_out(p); //write to swap partition
 				if (ok)
 					p->frame = NULL;
-			}
 		}
-		
-
-/* add code here */
 
   return ok;
 }

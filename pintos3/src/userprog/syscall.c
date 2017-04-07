@@ -505,25 +505,19 @@ static void
 unmap (struct mapping *m) 
 {
 /* add code here */
-	//file_seek(m->file, m->base);
 	int i;
 	lock_acquire(&fs_lock);
 	m->file = file_reopen(m->file);
 	lock_release(&fs_lock);
 	for (i = 0; i<m->page_cnt; i++)
 	{
-		if (pagedir_is_dirty(thread_current()->pagedir, m->base + (i * PGSIZE) ))
-		{
-			//int bytes_writeen = file_write_at(m->file, m->base, 
-			//p->file, p->frame->base, p->file_bytes, p->file_offset
-			page_deallocate(m->base + (i * PGSIZE));
-		}
+		page_deallocate(m->base + (i * PGSIZE));
 	}
 	lock_acquire(&fs_lock);
 	file_close(m->file);
 	lock_release(&fs_lock);
 	list_remove(&m->elem);
-	free(m);	
+	free(m);	//free mapping struct
 }
  
 /* Mmap system call. */

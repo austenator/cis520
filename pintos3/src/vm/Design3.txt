@@ -1,0 +1,125 @@
++---------------------------+
+|               CIS 520                   |
+| PROJECT 3: Virtual Memory |
+|     DESIGN DOCUMENT       |
++---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names of your group members.
+
+Joshua Langford
+Tricia Schmitz
+Austen Henry
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+-Blake Smethers, personal advice
+-https://github.com/cctv2206/Pintos-project-3/blob/master/src/userprog/syscall.c 
+
+			PAGE TABLE MANAGEMENT
+			=====================
+
+---- ALGORITHMS ----
+
+>> A1: In a few paragraphs, describe the existing code for locating the
+>> frame, if any, that contains the data of a given page.
+
+In order to locate a frame that contains the data of a given page, we first start by searching the current thread’s pages. Once the page is found, it contains a field for a frame reference that points to the location of the frame in memory.
+
+---- SYNCHRONIZATION ----
+
+>> A2: When two user processes both need a new frame at the same time,
+>> how are races avoided?
+
+In frame.c we use a lock (specifically scan_lock) and acquire it before searching for new free frames. This way, multiple processes can’t be searching for free frames at the same time.
+
+		       PAGING TO AND FROM DISK
+		       =======================
+
+---- ALGORITHMS ----
+
+>> B1: When a frame is required but none is free, some frame must be
+>> evicted.  Describe the algorithm used to choose a frame to evict.
+
+We first look for a free frame in memory, but if there is no free frame we need to find a frame that has not been recently accessed. It scans all frames, finds a frame thas not been recently accessed, evicts this frame and uses it for the requesting page.
+
+>> B2: Explain your heuristic for deciding whether a page fault for an
+>> invalid virtual address should cause the stack to be extended into
+>> the page that faulted.
+
+Our heuristic to determine if this "appears" to be a stack access is to check if it is within 32 bytes of the stack pointer and if allocating another page would keep the total stack size within the max size allowed for stacks. If so, allocate another page to the stack.
+
+
+			 MEMORY MAPPED FILES
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+We did not add any, however the mapping struct was new to us.
+
+
+---- ALGORITHMS ----
+
+>> C2: Describe how memory mapped files integrate into your virtual
+>> memory subsystem.  Explain how the page fault and eviction
+>> processes differ between swap pages and other pages.
+
+Memory mapped files are pulled into the virtual memory and assigned pages. We assign the current thread’s mapped files a mapping id in which to lookup and manipulate mapped files. This provides simpler access to a file from a thread/process.
+
+The difference in page faults is if we fault on a swap page, we swap it in from the partition, if we fault on a regular page we read its data in from disk.
+
+The difference in eviction between swap pages and regular pages is that when the swap partition is full we return an error but for regular pages we evict one to free up a frame.
+
+>> C3: Explain how you determine whether a new file mapping overlaps
+>> any existing segment.
+
+We would look up the page in the page table as we allocate it and depending on whether or not it page faults, we will know if something is already mapped at that location.	
+
+
+---- RATIONALE ----
+
+>> C4: Mappings created with "mmap" have similar semantics to those of
+>> data demand-paged from executables, except that "mmap" mappings are
+>> written back to their original files, not to swap.  This implies
+>> that much of their implementation can be shared.  Explain why your
+>> implementation either does or does not share much of the code for
+>> the two situations.
+	
+We did not implement any additional structures or code to accomplish demand paging (page-faulting) other than what was already included in the code. Implementation of mmap differs from the demand paging of executables because mmap writes data pertaining to the file back to the file, whereas executables store locally created data to the swap partition and not to a file location. 
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+	--A lot of the code for this was already implemented but the documentation made it seem like we had to still implement it so it was very confusing and we lost valuable project time. 
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
+
+
